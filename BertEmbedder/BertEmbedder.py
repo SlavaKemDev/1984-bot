@@ -30,5 +30,5 @@ class BertEmbedder:
             return last_hidden_states.mean(dim=1).numpy()
 
     @staticmethod
-    def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> float:
+    def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))

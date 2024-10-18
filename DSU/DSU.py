@@ -1,5 +1,5 @@
 class DSU:
-    def __init__(self, n: int):
+    def __init__(self, n: int = 0):
         self._parent = [i for i in range(n)]
         self._size = [1] * n
 
@@ -29,3 +29,10 @@ class DSU:
 
     def is_connected(self, a: int, b: int) -> bool:
         return self.find(a) == self.find(b)
+
+    def add_vertex(self) -> int:
+        vert_id = len(self._parent)
+        self._parent.append(vert_id)
+        self._size.append(1)
+
+        return vert_id

@@ -3,7 +3,6 @@ from .Point import Point
 
 
 class DataPair:
-    def __init__(self, point: Point, data: Any, vert_id: int):
+    def __init__(self, point: Point, data: Any):
         self.point = point
         self.data = data
-        self.vert_id = vert_id

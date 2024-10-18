@@ -12,6 +12,14 @@ class TestDSU(unittest.TestCase):
         self.assertFalse(dsu.is_connected(0, 2))
         self.assertEqual(dsu.size(0), 2)
 
+        vert = dsu.add_vertex()
+
+        dsu.union(0, vert)
+
+        self.assertTrue(dsu.is_connected(0, vert))
+        self.assertTrue(dsu.is_connected(1, vert))
+        self.assertEqual(dsu.size(0), 3)
+
 
 if __name__ == '__main__':
     unittest.main()
