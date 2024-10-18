@@ -1,7 +1,11 @@
+from sortedcontainers import SortedSet
+from typing import Any
+
+
 class DSU:
-    def __init__(self, n: int = 0):
-        self._parent = [i for i in range(n)]
-        self._size = [1] * n
+    def __init__(self):
+        self._parent: list[int] = []
+        self._elements: list[SortedSet] = []
 
     def find(self, v: int) -> int:
         if v == self._parent[v]:
@@ -15,24 +19,31 @@ class DSU:
         b = self.find(b)
 
         if a != b:
-            if self._size[a] < self._size[b]:
+            if len(self._elements[a]) < len(self._elements[b]):
                 a, b = b, a
 
             self._parent[b] = a
-            self._size[a] += self._size[b]
+
+            for elem in self._elements[b]:
+                self._elements[a].add(elem)
+
+            self._elements[b].clear()
 
     def get(self, v: int) -> int:
         return self.find(v)
 
     def size(self, v: int) -> int:
-        return self._size[self.find(v)]
+        return len(self._elements[self.find(v)])
+
+    def get_elements(self, v: int) -> SortedSet:
+        return self._elements[self.find(v)]
 
     def is_connected(self, a: int, b: int) -> bool:
         return self.find(a) == self.find(b)
 
-    def add_vertex(self) -> int:
+    def add_vertex(self, data: Any) -> int:
         vert_id = len(self._parent)
         self._parent.append(vert_id)
-        self._size.append(1)
+        self._elements.append(SortedSet([data]))
 
         return vert_id

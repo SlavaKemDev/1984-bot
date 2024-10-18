@@ -4,11 +4,14 @@ from QuadTree import QuadTree, Point
 from DSU import DSU
 from BertEmbedder import BertEmbedder
 
+from datetime import datetime, timedelta
+
 
 class TextManager:
-    def __init__(self, max_neighbours, threshold):
+    def __init__(self, max_neighbours, threshold, messages_time_gap: timedelta):
         self.max_neighbours = max_neighbours
         self.threshold = threshold
+        self.messages_time_gap = messages_time_gap
 
         self.embedder = BertEmbedder()
         default_dim = self.embedder.get_embeddings("test").shape[0]
@@ -16,11 +19,11 @@ class TextManager:
         self.quad_tree = QuadTree(Point([0] * default_dim), Point([1] * default_dim))
         self.dsu = DSU()
 
-    def add_text(self, text: str):
+    def add_text(self, text: str, dt: datetime):
         embeddings = self.embedder.get_embeddings(text)
         norm = embeddings / np.linalg.norm(embeddings)
 
-        dsu_vert = self.dsu.add_vertex()
+        dsu_vert = self.dsu.add_vertex(dt)
 
         self.quad_tree.add_point(Point(norm.tolist()), (text, dsu_vert))
 
@@ -38,7 +41,7 @@ class TextManager:
 
         return nearest, cosine_similarity
 
-    def check_is_available(self, text: str):
+    def check_is_available(self, text: str, dt: datetime):
         embeddings = self.embedder.get_embeddings(text)
         nearest, cosine_similarity = self._get_max_similar(embeddings)
 
@@ -47,7 +50,8 @@ class TextManager:
 
         dsu_vert = nearest.data[1]
 
-        if self.dsu.size(dsu_vert) < self.max_neighbours:
+        if (self.dsu.size(dsu_vert) < self.max_neighbours
+                or dt - self.dsu.get_elements(dsu_vert)[-self.max_neighbours] >= self.messages_time_gap):
             return True
 
         return False
