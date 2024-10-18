@@ -1,0 +1,5 @@
+sortedcontainers~=2.4.0
+numpy~=2.1.2
+torch~=2.5.0
+transformers~=4.45.2
+python-dotenv~=1.0.1

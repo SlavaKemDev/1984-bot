@@ -18,6 +18,11 @@ class TestTextManager(unittest.TestCase):
 
             self.assertEqual(nearest.data[0], pair["sentence_1"])
 
+        text_manager.mark_explicit("Привет, как твои дела?")
+
+        self.assertFalse(text_manager.check_is_available("Привет, как твои дела?", datetime.now()))
+        self.assertTrue(text_manager.check_is_available("ГООООООООЛЛЛЛЛЛЛЛЛ", datetime.now()))
+
 
 if __name__ == '__main__':
     unittest.main()

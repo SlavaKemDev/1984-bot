@@ -109,6 +109,9 @@ class QuadTree:
 
         return ans
 
-    def find_nearest(self, point: Point) -> DataPair:  # find nearest point
+    def find_nearest(self, point: Point) -> Union[DataPair, None]:  # find nearest point
         vert = self._rec_find_nearest(point, 0)
+        if not vert:
+            return None
+
         return DataPair(vert.point, vert.data)
