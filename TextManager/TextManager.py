@@ -3,6 +3,7 @@ import numpy as np
 from QuadTree import QuadTree, Point
 from DSU import DSU
 from BertEmbedder import BertEmbedder
+from .VertInfo import VertInfo
 
 from datetime import datetime, timedelta
 
@@ -23,7 +24,7 @@ class TextManager:
         embeddings = self.embedder.get_embeddings(text)
         norm = embeddings / np.linalg.norm(embeddings)
 
-        dsu_vert = self.dsu.add_vertex(dt)
+        dsu_vert = self.dsu.add_vertex(VertInfo(dt, False))
 
         self.quad_tree.add_point(Point(norm.tolist()), (text, dsu_vert))
 
@@ -45,13 +46,7 @@ class TextManager:
         embeddings = self.embedder.get_embeddings(text)
         nearest, cosine_similarity = self._get_max_similar(embeddings)
 
-        if cosine_similarity < self.threshold:
-            return True
-
         dsu_vert = nearest.data[1]
 
-        if (self.dsu.size(dsu_vert) < self.max_neighbours
-                or dt - self.dsu.get_elements(dsu_vert)[-self.max_neighbours] >= self.messages_time_gap):
-            return True
-
-        return False
+        return (cosine_similarity < self.threshold
+                or self.dsu.get_data(dsu_vert).can_merge_new(self.max_neighbours, self.messages_time_gap, dt))
