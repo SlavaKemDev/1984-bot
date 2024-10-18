@@ -2,7 +2,7 @@ import unittest
 from BertEmbedder import BertEmbedder
 
 
-class MyTestCase(unittest.TestCase):
+class TestBertEmbedder(unittest.TestCase):
     def test_cosine_similarity(self):
         good_sentence_pairs = [
             {

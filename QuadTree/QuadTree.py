@@ -71,9 +71,9 @@ class QuadTree:
         vert_id = self._rec_add_point(point, 0)
         self.vert[vert_id].data = data
 
-    def _rec_find_nearest(self, point: Point, vert_id, h: int = 0) -> Vert:  # recursively fin nearest point
+    def _rec_find_nearest(self, point: Point, vert_id, h: int = 0) -> int:  # recursively fin nearest point
         if self.vert[vert_id].point:  # return point if in leaf
-            return self.vert[vert_id]
+            return vert_id
 
         # create candidates to check them
         now_vert = self._push_point(point, vert_id, h, True)
@@ -94,11 +94,12 @@ class QuadTree:
                 ans = rec_ans
                 continue
 
-            if (rec_ans.point - point).length() < (ans.point - point).length():  # found new min
+            if (self.vert[rec_ans].point - point).length() < (self.vert[ans].point - point).length():  # found new min
                 ans = rec_ans
 
         return ans
 
     def find_nearest(self, point: Point) -> DataPair:  # find nearest point
-        vert = self._rec_find_nearest(point, 0)
-        return DataPair(vert.point, vert.data)
+        vert_id = self._rec_find_nearest(point, 0)
+        vert = self.vert[vert_id]
+        return DataPair(vert.point, vert.data, vert_id)

@@ -4,7 +4,7 @@ import unittest
 from QuadTree import QuadTree, Point
 
 
-class MyTestCase(unittest.TestCase):
+class TestQuadTree(unittest.TestCase):
     def test_base_cases(self):
         tree = QuadTree(Point([0, 0]), Point([10, 10]))
 

@@ -15,7 +15,7 @@ class BertEmbedder:
             BertEmbedder._tokenizer = BertTokenizer.from_pretrained(model_name)
             BertEmbedder._model = BertModel.from_pretrained(model_name)
 
-    def get_embeddings(self, texts: Union[str, List[str]]) -> torch.Tensor:
+    def get_embeddings(self, texts: Union[str, List[str]]) -> np.ndarray:
         # Get embeddings for a single text or a list of texts.
 
         if isinstance(texts, str):
