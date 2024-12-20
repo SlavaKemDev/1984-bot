@@ -5,3 +5,4 @@ transformers~=4.45.2
 python-dotenv~=1.0.1
 fasttext~=0.9.3
 huggingface-hub~=0.25.2
+SQLAlchemy~=2.0.36
