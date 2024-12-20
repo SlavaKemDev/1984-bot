@@ -3,3 +3,5 @@ numpy~=2.1.2
 torch~=2.5.0
 transformers~=4.45.2
 python-dotenv~=1.0.1
+fasttext~=0.9.3
+huggingface-hub~=0.25.2

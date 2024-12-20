@@ -12,10 +12,19 @@ load_dotenv()
 text_manager = TextManager(5, 0.7, timedelta(minutes=5))
 bot = TeleBot(os.environ['BOT_TOKEN'])
 
+CHANNEL_ID = os.environ['CHANNEL_ID']
+REMOVE_DICE = os.environ['REMOVE_DICE']
+
 
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.send_message(message.chat.id, "Big Brother is watching you!")
+
+
+@bot.message_handler(content_types=['dice'])
+def remove_dice(message: telebot.types.Message):
+    if REMOVE_DICE:
+        bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
 
 
 @bot.message_handler(commands=['mute'])
