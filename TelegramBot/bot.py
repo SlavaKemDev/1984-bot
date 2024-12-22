@@ -1,9 +1,12 @@
 import os
 from dataclasses import dataclass
+import asyncio
 
 import telebot.types
 from dotenv import load_dotenv
 from telebot import TeleBot
+from telebot import apihelper
+from telebot.async_telebot import AsyncTeleBot
 from datetime import datetime, timedelta
 import hashlib
 
@@ -13,7 +16,7 @@ from DataBase import *
 load_dotenv()
 
 text_manager = TextManager(5, 0.7, timedelta(minutes=5))
-bot = TeleBot(os.environ['BOT_TOKEN'])
+bot = AsyncTeleBot(os.environ['BOT_TOKEN'], parse_mode='HTML')
 
 CHANNEL_ID = os.environ['CHANNEL_ID']
 REMOVE_DICE = os.environ['REMOVE_DICE']
@@ -28,7 +31,7 @@ class MessageAttachment:
     hash: str
 
 
-def parse_attachment(message: telebot.types.Message) -> Optional[MessageAttachment]:
+async def parse_attachment(message: telebot.types.Message) -> Optional[MessageAttachment]:
     for content_type in MODERATING_TYPES:
         attachment = getattr(message, content_type)
 
@@ -38,8 +41,8 @@ def parse_attachment(message: telebot.types.Message) -> Optional[MessageAttachme
         if isinstance(attachment, list):  # get file with max quality
             attachment = attachment[-1]
 
-        file_info = bot.get_file(attachment.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
+        file_info = await bot.get_file(attachment.file_id)
+        downloaded_file = await bot.download_file(file_info.file_path)
         file_hash = hashlib.sha512(downloaded_file).hexdigest()
 
         return MessageAttachment(content_type, file_hash)
@@ -50,17 +53,17 @@ def get_media_group_id(message: telebot.types.Message):
 
 
 @bot.message_handler(content_types=['dice'])
-def remove_dice(message: telebot.types.Message):  # Remove all dices, except casino jackpot
+async def remove_dice(message: telebot.types.Message):  # Remove all dices, except casino jackpot
     is_jackpot = message.dice.emoji == '🎰' and message.dice.value in [1, 22, 43, 64]
 
     if REMOVE_DICE and (not is_jackpot or REMOVE_JACKPOT):
-        bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
+        await bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
 
 
 @bot.message_handler(content_types=MODERATING_TYPES)
-def handle_post(message: telebot.types.Message):  # Handle all media messages
+async def handle_post(message: telebot.types.Message):  # Handle all media messages
     media_group_id = get_media_group_id(message)
-    attachment = parse_attachment(message)
+    attachment = await parse_attachment(message)
 
     with Session() as session:
         content_type = attachment.content_type
@@ -86,7 +89,7 @@ def handle_post(message: telebot.types.Message):  # Handle all media messages
         item = AttachmentItem(
             attachment_id=attachment.id,
             media_group_id=media_group_id,
-            message_id=message.message_id,
+            message_id=message.forward_from_message_id,
             created_at=datetime.now()
         )
         session.add(item)
@@ -94,12 +97,12 @@ def handle_post(message: telebot.types.Message):  # Handle all media messages
         if not attachment.is_banned:
             session.commit()
         else:
-            bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
+            await bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
             session.rollback()
 
 
 @bot.message_handler(commands=['ban'])
-def ban_content(message: telebot.types.Message):
+async def ban_content(message: telebot.types.Message):
     if message.sender_chat and message.sender_chat.id == message.chat.id:
         is_admin = True  # if sent by anonymous admin
     else:
@@ -107,7 +110,7 @@ def ban_content(message: telebot.types.Message):
         user_id = message.from_user.id
 
         # Retrieve the user's status in the chat
-        chat_member = bot.get_chat_member(chat_id, user_id)
+        chat_member = await bot.get_chat_member(chat_id, user_id)
 
         # Check if the user is an administrator or the chat creator
         is_admin = chat_member.status in ['administrator', 'creator']
@@ -116,7 +119,6 @@ def ban_content(message: telebot.types.Message):
         return
 
     target_message = message.reply_to_message
-
     media_group_id = get_media_group_id(target_message)
 
     with Session() as session:
@@ -134,32 +136,38 @@ def ban_content(message: telebot.types.Message):
             # Ban this attachment
             attachment.is_banned = True
 
-            bot.delete_message(CHANNEL_ID, attachment_item.message_id)
+            for cur_attachment_item in attachment.items:  # Remove all messages with this attachment
+                await bot.delete_message(CHANNEL_ID, cur_attachment_item.message_id)
 
-        bot.delete_message(message.chat.id, message.message_id)  # Delete the command message
+        await bot.delete_message(message.chat.id, message.message_id)  # Delete the command message
 
         session.commit()
 
 
 @bot.message_handler(commands=['mute'])
-def mute(message: telebot.types.Message):
+async def mute(message: telebot.types.Message):
     if not message.reply_to_message:
-        bot.send_message(message.chat.id, "Эту команду нужно отправить в ответ на сообщение!")
+        await bot.send_message(message.chat.id, "Эту команду нужно отправить в ответ на сообщение!")
         return
 
     text_manager.mark_explicit(message.reply_to_message.text.lower())
 
 
 @bot.message_handler(content_types=['text'])
-def text_handler(message: telebot.types.Message):
+async def text_handler(message: telebot.types.Message):
     text = message.text.lower()
 
-    target_message = message.reply_to_message
-
     if not text_manager.check_is_available(text, datetime.now()):
-        bot.delete_message(CHANNEL_ID, target_message.forward_from_message_id)
+        await bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
 
     text_manager.add_text(message.text.lower(), datetime.now())
 
 
-bot.polling(timeout=30, none_stop=True)
+async def main():
+    loop = asyncio.get_event_loop()
+    loop.set_debug(True)
+
+    await bot.polling(non_stop=True, request_timeout=60)
+
+if __name__ == '__main__':
+    asyncio.run(main())
