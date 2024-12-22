@@ -1,0 +1,10 @@
+На локалке:
+docker build --platform linux/amd64 -t nginx:latest .
+Там получаем ID вида sha256:XXXX...XXX
+docker save sha256:XXXX...XXX -o output/moderator_bot
+Это на сервер выгружаем
+
+На сервере:
+docker load --input moderator_bot
+Там тоже получаем ID
+docker run sha256:XXXX...XXX -d

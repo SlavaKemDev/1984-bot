@@ -10,6 +10,8 @@ import hashlib
 from TextManager import TextManager
 from DataBase import *
 
+from collections import OrderedDict
+
 load_dotenv()
 
 text_manager = TextManager(5, 0.7, timedelta(minutes=5))
@@ -31,17 +33,19 @@ def parse_attachments(message: telebot.types.Message) -> list[MessageAttachment]
     answer: list[MessageAttachment] = []
 
     for content_type in MODERATING_TYPES:
-        attachments = getattr(message, content_type) or []
-        if not isinstance(attachments, list):
-            attachments = [attachments]
+        attachment = getattr(message, content_type)
 
-        for file in attachments:
-            file_info = bot.get_file(file.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
+        if not attachment:
+            continue
 
-            file_hash = hashlib.sha512(downloaded_file).hexdigest()
+        if isinstance(attachment, list):
+            attachment = attachment[-1]
 
-            answer.append(MessageAttachment(content_type, file_hash))
+        file_info = bot.get_file(attachment.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        file_hash = hashlib.sha512(downloaded_file).hexdigest()
+
+        answer.append(MessageAttachment(content_type, file_hash))
 
     return answer
 
@@ -54,10 +58,16 @@ def remove_dice(message: telebot.types.Message):
 
 @bot.message_handler(content_types=MODERATING_TYPES)
 def handle_post(message: telebot.types.Message):
+    print(message)
+
     with Session() as session:
         content_approved = True
 
-        for attachment in parse_attachments(message):
+        attachments = parse_attachments(message)
+
+        for attachment in attachments:
+            print(attachment)
+
             content_type = attachment.content_type
             file_hash = attachment.hash
 
@@ -82,6 +92,8 @@ def handle_post(message: telebot.types.Message):
         else:
             bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
             session.rollback()
+
+        session.close()
 
 
 @bot.message_handler(commands=['ban'])
@@ -140,6 +152,8 @@ def ban_content(message: telebot.types.Message):
 
         bot.delete_message(CHANNEL_ID, target_message.forward_from_message_id)
         session.commit()
+
+        session.close()
 
 
 @bot.message_handler(commands=['mute'])
