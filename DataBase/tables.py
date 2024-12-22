@@ -1,7 +1,7 @@
 from typing import List
 from typing import Optional
 from sqlalchemy import ForeignKey
-from sqlalchemy import String, Integer, Boolean
+from sqlalchemy import String, Integer, Boolean, DateTime
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -41,5 +41,8 @@ class AttachmentItem(Base):
     attachment_id = mapped_column(Integer, ForeignKey('attachments.id'))
     attachment = relationship('Attachment', back_populates='items')
 
-    created_at = mapped_column(Integer)
+    media_group_id = mapped_column(String)
+    message_id = mapped_column(Integer)
+
+    created_at = mapped_column(DateTime)
 

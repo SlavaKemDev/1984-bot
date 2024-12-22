@@ -10,8 +10,6 @@ import hashlib
 from TextManager import TextManager
 from DataBase import *
 
-from collections import OrderedDict
-
 load_dotenv()
 
 text_manager = TextManager(5, 0.7, timedelta(minutes=5))
@@ -19,8 +17,9 @@ bot = TeleBot(os.environ['BOT_TOKEN'])
 
 CHANNEL_ID = os.environ['CHANNEL_ID']
 REMOVE_DICE = os.environ['REMOVE_DICE']
+REMOVE_JACKPOT = os.environ['REMOVE_JACKPOT']
 
-MODERATING_TYPES = ['audio', 'video', 'photo', 'document', 'animation', 'voice', 'video_note']
+MODERATING_TYPES = ['audio', 'video', 'photo', 'animation', 'voice', 'video_note', 'document']
 
 
 @dataclass
@@ -29,71 +28,74 @@ class MessageAttachment:
     hash: str
 
 
-def parse_attachments(message: telebot.types.Message) -> list[MessageAttachment]:
-    answer: list[MessageAttachment] = []
-
+def parse_attachment(message: telebot.types.Message) -> Optional[MessageAttachment]:
     for content_type in MODERATING_TYPES:
         attachment = getattr(message, content_type)
 
         if not attachment:
             continue
 
-        if isinstance(attachment, list):
+        if isinstance(attachment, list):  # get file with max quality
             attachment = attachment[-1]
 
         file_info = bot.get_file(attachment.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         file_hash = hashlib.sha512(downloaded_file).hexdigest()
 
-        answer.append(MessageAttachment(content_type, file_hash))
+        return MessageAttachment(content_type, file_hash)
 
-    return answer
+
+def get_media_group_id(message: telebot.types.Message):
+    return message.media_group_id or f"single_{message.message_id}"
 
 
 @bot.message_handler(content_types=['dice'])
-def remove_dice(message: telebot.types.Message):
-    if REMOVE_DICE:
+def remove_dice(message: telebot.types.Message):  # Remove all dices, except casino jackpot
+    is_jackpot = message.dice.emoji == '🎰' and message.dice.value in [1, 22, 43, 64]
+
+    if REMOVE_DICE and (not is_jackpot or REMOVE_JACKPOT):
         bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
 
 
 @bot.message_handler(content_types=MODERATING_TYPES)
-def handle_post(message: telebot.types.Message):
-    print(message)
+def handle_post(message: telebot.types.Message):  # Handle all media messages
+    media_group_id = get_media_group_id(message)
+    attachment = parse_attachment(message)
 
     with Session() as session:
-        content_approved = True
+        content_type = attachment.content_type
+        file_hash = attachment.hash
 
-        attachments = parse_attachments(message)
+        # Get or create attachment type
+        attachment_type = session.query(AttachmentType).filter_by(name=content_type).first()
 
-        for attachment in attachments:
-            print(attachment)
+        if not attachment_type:
+            attachment_type = AttachmentType(name=content_type)
+            session.add(attachment_type)
+            session.commit()
 
-            content_type = attachment.content_type
-            file_hash = attachment.hash
+        # Get or create attachment
+        attachment = session.query(Attachment).filter_by(type_id=attachment_type.id, hash=file_hash).first()
 
-            attachment_type = session.query(AttachmentType).filter_by(name=content_type).first()
+        if not attachment:
+            attachment = Attachment(type_id=attachment_type.id, hash=file_hash)
+            session.add(attachment)
+            session.commit()
 
-            if not attachment_type:
-                attachment_type = AttachmentType(name=content_type)
-                session.add(attachment_type)
-                session.commit()
+        # Write message to db
+        item = AttachmentItem(
+            attachment_id=attachment.id,
+            media_group_id=media_group_id,
+            message_id=message.message_id,
+            created_at=datetime.now()
+        )
+        session.add(item)
 
-            attachment = session.query(Attachment).filter_by(hash=file_hash).first()
-
-            if not attachment:
-                attachment = Attachment(type_id=attachment_type.id, hash=file_hash)
-                session.add(attachment)
-                session.commit()
-
-            content_approved &= not attachment.is_banned
-
-        if content_approved:
+        if not attachment.is_banned:
             session.commit()
         else:
             bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
             session.rollback()
-
-        session.close()
 
 
 @bot.message_handler(commands=['ban'])
@@ -110,50 +112,33 @@ def ban_content(message: telebot.types.Message):
         # Check if the user is an administrator or the chat creator
         is_admin = chat_member.status in ['administrator', 'creator']
 
-    if not is_admin:  # You got it
-        bot.reply_to(message, "Ты кто такой? Пошёл нахуй!")
+    if not is_admin:  # Command only for admins
         return
 
     target_message = message.reply_to_message
 
-    attachments = parse_attachments(target_message)
-
-    args = list(map(int, message.text.split()[1:])) or list(range(1, len(attachments) + 1))  # args from the command
+    media_group_id = get_media_group_id(target_message)
 
     with Session() as session:
-        banned_ids = []
+        attachment_items = session.query(AttachmentItem).filter_by(media_group_id=media_group_id).all()
 
-        for i in args:
-            i -= 1
+        args = list(map(int, message.text.split()[1:])) or list(range(1, len(attachment_items) + 1))  # args from the command
 
-            if i < 0 or i >= len(attachments):
+        for i in map(lambda x: x - 1, args):
+            if i < 0 or i >= len(attachment_items):
                 continue
 
-            banned_ids.append(i + 1)
-
-            # Retrieve the attachment and its type
-            telegram_attachment = attachments[i]
-            attachment_type = session.query(AttachmentType).filter_by(name=telegram_attachment.content_type).first()
-
-            if not attachment_type:
-                attachment_type = AttachmentType(name=telegram_attachment.content_type)
-                session.add(attachment_type)
-                session.commit()
-
-            attachment = session.query(Attachment).filter_by(hash=telegram_attachment.hash).first()
-
-            if not attachment:
-                attachment = Attachment(type_id=attachment_type.id, hash=telegram_attachment.hash)
-                session.add(attachment)
-                session.commit()
+            attachment_item = attachment_items[i]
+            attachment = attachment_item.attachment
 
             # Ban this attachment
             attachment.is_banned = True
 
-        bot.delete_message(CHANNEL_ID, target_message.forward_from_message_id)
-        session.commit()
+            bot.delete_message(CHANNEL_ID, attachment_item.message_id)
 
-        session.close()
+        bot.delete_message(message.chat.id, message.message_id)  # Delete the command message
+
+        session.commit()
 
 
 @bot.message_handler(commands=['mute'])
