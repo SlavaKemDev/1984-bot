@@ -4,8 +4,6 @@ import asyncio
 
 import telebot.types
 from dotenv import load_dotenv
-from telebot import TeleBot
-from telebot import apihelper
 from telebot.async_telebot import AsyncTeleBot
 from datetime import datetime, timedelta
 import hashlib
