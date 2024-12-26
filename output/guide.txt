@@ -1,5 +1,5 @@
 На локалке:
-docker build --platform linux/amd64 -t nginx:latest .
+docker build --platform linux/amd64 -t nginx:latest . --progress=plain --no-cache
 Там получаем ID вида sha256:XXXX...XXX
 docker save sha256:XXXX...XXX -o output/moderator_bot
 Это на сервер выгружаем

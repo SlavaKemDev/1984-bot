@@ -1,4 +1,5 @@
 import os
+
 from dataclasses import dataclass
 import asyncio
 
@@ -8,7 +9,7 @@ from telebot.async_telebot import AsyncTeleBot
 from datetime import datetime, timedelta
 import hashlib
 
-from TextManager import TextManager
+from TextManager import *
 from DataBase import *
 
 load_dotenv()
@@ -20,7 +21,7 @@ CHANNEL_ID = os.environ['CHANNEL_ID']
 REMOVE_DICE = os.environ['REMOVE_DICE']
 REMOVE_JACKPOT = os.environ['REMOVE_JACKPOT']
 
-MODERATING_TYPES = ['audio', 'video', 'photo', 'animation', 'voice', 'video_note', 'document']
+MODERATING_TYPES = ['sticker', 'audio', 'video', 'photo', 'animation', 'voice', 'video_note', 'document']
 
 
 @dataclass
@@ -167,5 +168,4 @@ async def main():
 
     await bot.polling(non_stop=True, request_timeout=60)
 
-if __name__ == '__main__':
-    asyncio.run(main())
+asyncio.run(main())

@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --verbose
 
 # Copy the rest of the application code into the container
 COPY . .
@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8443
 
 # Command to run the application
-CMD ["python", "bot/main.py"]
+CMD ["python", "main.py"]

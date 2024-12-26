@@ -1,9 +1,10 @@
 sortedcontainers~=2.4.0
-numpy~=2.1.2
-torch~=2.5.0
-transformers~=4.45.2
+numpy~=1.26.4
 python-dotenv~=1.0.1
-fasttext~=0.9.3
 huggingface-hub~=0.25.2
 SQLAlchemy~=2.0.36
 pyTelegramBotAPI~=4.25.0
+compress-fasttext~=0.1.5
+gensim~=4.3.3
+aiohttp~=3.11.11
+scikit-learn~=1.6.0

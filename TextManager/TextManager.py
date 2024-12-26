@@ -2,7 +2,7 @@ import numpy as np
 
 from QuadTree import QuadTree, Point
 from DSU import DSU
-from BertEmbedder import BertEmbedder
+from FastTextEmbedder import *
 from .VertInfo import VertInfo
 
 from datetime import datetime, timedelta
@@ -14,7 +14,7 @@ class TextManager:
         self.threshold = threshold
         self.messages_time_gap = messages_time_gap
 
-        self.embedder = BertEmbedder()
+        self.embedder = FastTextEmbedder()
         default_dim = self.embedder.get_embeddings("test").shape[0]
 
         self.quad_tree = QuadTree(Point([-1] * default_dim), Point([1] * default_dim))
@@ -40,7 +40,10 @@ class TextManager:
         return self._get_max_similar(embeddings)
 
     def _get_max_similar(self, embeddings):
-        norm = embeddings / np.linalg.norm(embeddings)
+        if abs(np.linalg.norm(embeddings)) > 1e-7:
+            norm = embeddings / np.linalg.norm(embeddings)
+        else:
+            return None, 0
 
         nearest = self.quad_tree.find_nearest(Point(norm.tolist()))
 
@@ -49,7 +52,7 @@ class TextManager:
 
         nearest_norm = np.array(nearest.point.coords)
 
-        cosine_similarity = BertEmbedder.cosine_similarity(norm, nearest_norm)
+        cosine_similarity = FastTextEmbedder.cosine_similarity(norm, nearest_norm)
 
         return nearest, cosine_similarity
 
