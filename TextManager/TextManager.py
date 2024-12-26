@@ -29,6 +29,10 @@ class TextManager:
             return
 
         embeddings = self.embedder.get_embeddings(text)
+
+        if abs(np.linalg.norm(embeddings)) < 1e-4:
+            return
+
         norm = embeddings / np.linalg.norm(embeddings)
 
         dsu_vert = self.dsu.add_vertex(VertInfo(dt, False))
