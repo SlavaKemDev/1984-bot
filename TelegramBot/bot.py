@@ -18,8 +18,8 @@ text_manager = TextManager(5, 0.7, timedelta(minutes=5))
 bot = AsyncTeleBot(os.environ['BOT_TOKEN'], parse_mode='HTML')
 
 CHANNEL_ID = os.environ['CHANNEL_ID']
-REMOVE_DICE = os.environ['REMOVE_DICE']
-REMOVE_JACKPOT = os.environ['REMOVE_JACKPOT']
+REMOVE_DICE = bool(int(os.environ['REMOVE_DICE']))
+REMOVE_JACKPOT = bool(int(os.environ['REMOVE_JACKPOT']))
 
 MODERATING_TYPES = ['sticker', 'audio', 'video', 'photo', 'animation', 'voice', 'video_note', 'document']
 
