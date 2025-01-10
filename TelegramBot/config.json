@@ -1,0 +1,6 @@
+{
+  "REMOVE_DICE": true,
+  "REMOVE_JACKPOT": false,
+  "MODERATING_TYPES": ["sticker", "audio", "video", "photo", "animation", "voice", "video_note", "document"],
+  "SAVE_PERIOD": 60
+}

@@ -1,4 +1,6 @@
 import os
+import json
+import pickle
 
 from dataclasses import dataclass
 import asyncio
@@ -12,16 +14,41 @@ import hashlib
 from TextManager import *
 from DataBase import *
 
+script_path = os.path.dirname(os.path.realpath(__file__))
+
 load_dotenv()
 
-text_manager = TextManager(5, 0.7, timedelta(minutes=5))
+if os.path.exists('text_manager.pkl'):  # load TextManager if saved
+    with open('text_manager.pkl', 'rb') as f:
+        text_manager = pickle.load(f)
+else:
+    text_manager = TextManager(5, 0.7, timedelta(minutes=5))
+
 bot = AsyncTeleBot(os.environ['BOT_TOKEN'], parse_mode='HTML')
-
 CHANNEL_ID = os.environ['CHANNEL_ID']
-REMOVE_DICE = bool(int(os.environ['REMOVE_DICE']))
-REMOVE_JACKPOT = bool(int(os.environ['REMOVE_JACKPOT']))
 
-MODERATING_TYPES = ['sticker', 'audio', 'video', 'photo', 'animation', 'voice', 'video_note', 'document']
+with open(f'{script_path}/config.json', 'r') as f:
+    config = json.load(f)
+
+REMOVE_DICE = config['REMOVE_DICE']
+REMOVE_JACKPOT = config['REMOVE_JACKPOT']
+
+MODERATING_TYPES = config['MODERATING_TYPES']
+SAVE_PERIOD = config['SAVE_PERIOD']
+
+last_save = datetime.now()
+
+
+def save_state():  # TODO: implement save to database instead of save to pickle file
+    global last_save
+
+    if (datetime.now() - last_save).total_seconds() < SAVE_PERIOD:
+        return
+
+    last_save = datetime.now()
+
+    with open('text_manager.pkl', 'wb') as f:
+        pickle.dump(text_manager, f)
 
 
 @dataclass
@@ -155,6 +182,7 @@ async def mute(message: telebot.types.Message):
 @bot.message_handler(content_types=['text'])
 async def text_handler(message: telebot.types.Message):
     text = message.text.lower()
+    print(text)
 
     if not text_manager.check_is_available(text, datetime.now()):
         await bot.delete_message(CHANNEL_ID, message.forward_from_message_id)
