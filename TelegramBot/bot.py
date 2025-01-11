@@ -95,6 +95,9 @@ async def handle_post(message: telebot.types.Message):  # Handle all media messa
     if message.chat.id != CHANNEL_ID:
         return
 
+    if message.from_user is None or message.from_user.is_bot or message.from_user.id < 0:
+        await bot.delete_message(CHANNEL_ID, message.message_id)
+
     media_group_id = get_media_group_id(message)
     attachment = await parse_attachment(message)
 
