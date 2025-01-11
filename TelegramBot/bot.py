@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import asyncio
 
 import telebot.types
-from sympy.abc import lamda
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
@@ -40,6 +39,20 @@ MODERATING_TYPES = config['MODERATING_TYPES']
 SAVE_PERIOD = config['SAVE_PERIOD']
 
 last_save = datetime.now()
+
+
+def get_user(from_user: telebot.types.User, session: Session) -> TelegramUser:
+    user = session.query(TelegramUser).filter_by(id=from_user.id).first()
+
+    if not user:
+        user = TelegramUser(id=from_user.id,
+                            username=from_user.username,
+                            first_name=from_user.first_name,
+                            last_name=from_user.last_name)
+        session.add(user)
+        session.commit()
+
+    return user
 
 
 def save_state():  # TODO: implement save to database instead of save to pickle file
@@ -115,9 +128,16 @@ async def handle_post(message: telebot.types.Message):  # Handle all media messa
         # Get or create attachment
         attachment = session.query(Attachment).filter_by(type_id=attachment_type.id, hash=file_hash).first()
 
-        if not attachment:  # Сначала нужно кинуть медиа в бота
+        if not attachment and (
+                not message.from_user or message.from_user.is_bot or message.from_user.id < 0):  # Сначала нужно кинуть медиа в бота или постить не анонимно
             await bot.delete_message(CHANNEL_ID, message.message_id)
             return
+
+        if not attachment:  # Если выложили новое медиа не анонимно
+            user = get_user(message.from_user, session)
+            attachment = Attachment(type_id=attachment_type.id, hash=file_hash, from_user_id=user.id)
+            session.add(attachment)
+            session.commit()
 
         # Write message to db
         item = AttachmentItem(
@@ -209,15 +229,7 @@ async def handle_direct_message(message: telebot.types.Message):
         await bot.reply_to(message, "Бот может использоваться только администраторами канала.")
 
     with Session() as session:
-        user = session.query(TelegramUser).filter_by(id=message.from_user.id).first()
-
-        if not user:
-            user = TelegramUser(id=message.from_user.id,
-                                username=message.from_user.username,
-                                first_name=message.from_user.first_name,
-                                last_name=message.from_user.last_name)
-            session.add(user)
-            session.commit()
+        user = get_user(message.from_user, session)
 
         if not user.is_agreement_accepted:  # Сначала нужно принять соглашение
             markup = InlineKeyboardMarkup()
@@ -259,7 +271,7 @@ async def handle_direct_message(message: telebot.types.Message):
 @bot.callback_query_handler(func=lambda call: call.data == "cb_accept_agreement")
 async def accept_agreement(call: telebot.types.CallbackQuery):
     with Session() as session:
-        user = session.query(TelegramUser).filter_by(id=call.from_user.id).first()
+        user = get_user(call.from_user, session)
 
         if not user:
             await bot.answer_callback_query(call.id, "Произошла ошибка. Попробуйте еще раз.")
@@ -272,7 +284,8 @@ async def accept_agreement(call: telebot.types.CallbackQuery):
         session.commit()
 
         await bot.answer_callback_query(call.id, "Соглашение принято.")
-        await bot.send_message(call.from_user.id, "Согласие принято. Теперь вы можете отправлять сюда медиа, которые хотите опубликовать, они будут допущены к публикации без ограничения по числу постов. Но тем не менее, данные о том, кто допустил медиа к публикации, у нас остаются")
+        await bot.send_message(call.from_user.id,
+                               "Согласие принято. Теперь вы можете отправлять сюда медиа, которые хотите опубликовать, они будут допущены к публикации без ограничения по числу постов. Но тем не менее, данные о том, кто допустил медиа к публикации, у нас остаются")
 
 
 async def main():
