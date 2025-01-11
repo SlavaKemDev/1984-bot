@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import asyncio
 
 import telebot.types
+from sympy.abc import lamda
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
 from datetime import datetime, timedelta
@@ -95,9 +97,6 @@ async def handle_post(message: telebot.types.Message):  # Handle all media messa
     if message.chat.id != CHANNEL_ID:
         return
 
-    if message.from_user is None or message.from_user.is_bot or message.from_user.id < 0:
-        await bot.delete_message(CHANNEL_ID, message.message_id)
-
     media_group_id = get_media_group_id(message)
     attachment = await parse_attachment(message)
 
@@ -116,10 +115,9 @@ async def handle_post(message: telebot.types.Message):  # Handle all media messa
         # Get or create attachment
         attachment = session.query(Attachment).filter_by(type_id=attachment_type.id, hash=file_hash).first()
 
-        if not attachment:
-            attachment = Attachment(type_id=attachment_type.id, hash=file_hash)
-            session.add(attachment)
-            session.commit()
+        if not attachment:  # Сначала нужно кинуть медиа в бота
+            await bot.delete_message(CHANNEL_ID, message.message_id)
+            return
 
         # Write message to db
         item = AttachmentItem(
@@ -193,6 +191,88 @@ async def text_handler(message: telebot.types.Message):
         await bot.delete_message(CHANNEL_ID, message.message_id)
 
     text_manager.add_text(message.text.lower(), datetime.now())
+
+
+# Accept posts from direct messages
+
+@bot.message_handler(content_types=MODERATING_TYPES, func=lambda message: message.chat.id == message.from_user.id)
+async def handle_direct_media(message: telebot.types.Message):
+    await handle_direct_message(message)
+
+
+@bot.message_handler(func=lambda message: message.chat.id == message.from_user.id)
+async def handle_direct_message(message: telebot.types.Message):
+    admins_list = await bot.get_chat_administrators(CHANNEL_ID)
+    admin_ids = [admin.user.id for admin in admins_list]
+
+    if message.from_user.id not in admin_ids:  # Чтобы не писали с фейк аккаунтов
+        await bot.reply_to(message, "Бот может использоваться только администраторами канала.")
+
+    with Session() as session:
+        user = session.query(TelegramUser).filter_by(id=message.from_user.id).first()
+
+        if not user:
+            user = TelegramUser(id=message.from_user.id,
+                                username=message.from_user.username,
+                                first_name=message.from_user.first_name,
+                                last_name=message.from_user.last_name)
+            session.add(user)
+            session.commit()
+
+        if not user.is_agreement_accepted:  # Сначала нужно принять соглашение
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton("Принимаю соглашение", callback_data="cb_accept_agreement"))
+
+            await bot.reply_to(
+                message,
+                f"Для публикации медиа вы должны принять текст соглашения:\n\nЯ, {user.first_name} {user.last_name}, обязуюсь не публиковать контент, нарушающий законы Российской Федерации, а также не публиковать контент, нарушающий правила канала (правила канала, при их наличии, публикуются в канале и закрепляются).",
+                reply_markup=markup
+            )
+
+            return
+
+        attachment_data = await parse_attachment(message)
+
+        content_type = attachment_data.content_type
+        file_hash = attachment_data.hash
+
+        attachment_type = session.query(AttachmentType).filter_by(name=content_type).first()
+
+        if not attachment_type:
+            attachment_type = AttachmentType(name=content_type)
+            session.add(attachment_type)
+            session.commit()
+
+        attachment = session.query(Attachment).filter_by(type_id=attachment_type.id, hash=file_hash).first()
+
+        if attachment:
+            await bot.reply_to(message, "Медиа уже было опубликовано")
+            return
+
+        attachment = Attachment(type_id=attachment_type.id, hash=file_hash, from_user_id=user.id)
+        session.add(attachment)
+        session.commit()
+
+        await bot.reply_to(message, "Медиа доступно для публикации")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "cb_accept_agreement")
+async def accept_agreement(call: telebot.types.CallbackQuery):
+    with Session() as session:
+        user = session.query(TelegramUser).filter_by(id=call.from_user.id).first()
+
+        if not user:
+            await bot.answer_callback_query(call.id, "Произошла ошибка. Попробуйте еще раз.")
+
+        if user.is_agreement_accepted:
+            await bot.answer_callback_query(call.id, "Соглашение уже принято.")
+            return
+
+        user.is_agreement_accepted = True
+        session.commit()
+
+        await bot.answer_callback_query(call.id, "Соглашение принято.")
+        await bot.send_message(call.from_user.id, "Согласие принято. Теперь вы можете отправлять сюда медиа, которые хотите опубликовать, они будут допущены к публикации без ограничения по числу постов. Но тем не менее, данные о том, кто допустил медиа к публикации, у нас остаются")
 
 
 async def main():

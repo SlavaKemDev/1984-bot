@@ -28,6 +28,9 @@ class Attachment(Base):
     type_id = mapped_column(Integer, ForeignKey('attachment_types.id'))
     type = relationship('AttachmentType', back_populates='attachments')
 
+    from_user_id = mapped_column(Integer, ForeignKey('telegram_users.id'))
+    from_user = relationship('TelegramUser', back_populates='attachments')
+
     hash = mapped_column(String)
     is_banned = mapped_column(Boolean, default=False)
 
@@ -46,3 +49,15 @@ class AttachmentItem(Base):
 
     created_at = mapped_column(DateTime)
 
+
+class TelegramUser(Base):
+    __tablename__ = 'telegram_users'
+
+    id = mapped_column(Integer, primary_key=True)
+    username = mapped_column(String, nullable=True)
+    first_name = mapped_column(String)
+    last_name = mapped_column(String, nullable=True)
+
+    is_agreement_accepted = mapped_column(Boolean, default=False)
+
+    attachments = relationship('Attachment', back_populates='from_user')
