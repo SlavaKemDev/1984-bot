@@ -94,6 +94,11 @@ def get_media_group_id(message: telebot.types.Message):
     return message.media_group_id or f"single_{message.message_id}"
 
 
+async def process_link_preview(message: telebot.types.Message):
+    if message.link_preview_options is not None and not message.link_preview_options.is_disabled:
+        await bot.edit_message_text(message.text or message.caption or "", message.chat.id, message.message_id, disable_web_page_preview=True)
+
+
 @bot.channel_post_handler(content_types=['dice'])
 async def remove_dice(message: telebot.types.Message):  # Remove all dices, except casino jackpot
     if message.chat.id != CHANNEL_ID:
@@ -154,6 +159,8 @@ async def handle_post(message: telebot.types.Message):  # Handle all media messa
             await bot.delete_message(CHANNEL_ID, message.message_id)
             session.rollback()
 
+    await process_link_preview(message)
+
 
 @bot.channel_post_handler(commands=['ban'])
 async def ban_content(message: telebot.types.Message):
@@ -209,8 +216,11 @@ async def text_handler(message: telebot.types.Message):
 
     if not text_manager.check_is_available(text, datetime.now()):
         await bot.delete_message(CHANNEL_ID, message.message_id)
+        return
 
     text_manager.add_text(message.text.lower(), datetime.now())
+
+    await process_link_preview(message)
 
 
 # Accept posts from direct messages
